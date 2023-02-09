@@ -114,8 +114,8 @@ BEGIN
     WHERE 
       MY_TABLE.id = id_u;
 EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-    DBMS_OUTPUT.PUT_LINE('No such number');
+    WHEN OTHERS THEN
+    raise_application_error(SQLCODE,'No such id');
 END;
 
 
@@ -126,8 +126,8 @@ BEGIN
         student.MY_TABLE
     WHERE MY_TABLE.id = id_u;
 EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-    DBMS_OUTPUT.PUT_LINE('No such number');
+    WHEN OTHERS THEN
+    raise_application_error(SQLCODE,'No such id');
 END;
 
 
@@ -141,3 +141,30 @@ WHERE id >=1 and id <=10;
 EXECUTE UpdateById(2, 10);
 
 EXECUTE DeleteById(2);
+
+
+
+CREATE OR REPLACE Function Year_income(salary INTEGER, bonus INTEGER)
+   RETURN REAL
+IS
+    p REAL;
+    percent_error EXCEPTION;
+    PRAGMA exception_init(percent_error, -20001 );
+    negative_salary_error EXCEPTION;
+    PRAGMA exception_init(negative_salary_error, -20002 );
+BEGIN
+    IF salary < 0 THEN
+        RAISE negative_salary_error;
+    END IF;
+    IF bonus < 0 or bonus > 100 THEN
+        RAISE percent_error;
+    END IF;
+    p := bonus / 100;
+    RETURN (1 + p) * 12 * salary;
+EXCEPTION
+    WHEN negative_salary_error THEN
+    raise_application_error(-20001,'Salary must be >=0');
+    WHEN percent_error THEN
+    raise_application_error(-20002,'Percent must be between 0 and 100');
+END;
+select Year_income(-10, 1) from DUAL;
