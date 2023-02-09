@@ -13,7 +13,6 @@ CREATE TABLE student.My_table_without_triggeer (
     constraint PK_MYTABLE_WITHOUT_TG primary key (id)
 )
 
-
 CREATE SEQUENCE sq_my_table
 START WITH 1 
 INCREMENT BY 1 
@@ -25,6 +24,8 @@ BEGIN
   INTO :new.id
   FROM DUAL;
 END;
+
+
 
 DECLARE
     v NUMBER;
@@ -40,6 +41,8 @@ BEGIN
 END;
 
 SELECT COUNT(*) FROM student.My_table
+
+
 
 CREATE OR REPLACE Function IfEven RETURN VARCHAR2
 IS
@@ -75,6 +78,8 @@ SELECT IfEven() FROM dual;
 SELECT COUNT(*) FROM student.MY_TABLE
 WHERE mod(student.My_table.val, 2) = 0;
 
+
+
 CREATE OR REPLACE Function GetInsertComBy(id INTEGER)
    RETURN VARCHAR2
 IS
@@ -88,3 +93,51 @@ BEGIN
 END;
 
 SELECT * FROM student.My_table_without_triggeer;
+
+
+CREATE OR REPLACE Procedure InsertById(id_u INTEGER, val_u INTEGER)
+IS
+BEGIN
+    INSERT INTO 
+        student.My_table_without_triggeer(id, val) 
+    VALUES 
+        ( id_u, val_u);
+END;
+
+CREATE OR REPLACE Procedure UpdateById(id_u INTEGER, val_u INTEGER)
+IS
+BEGIN
+    UPDATE
+        student.MY_TABLE
+    SET
+        MY_TABLE.val = val_u
+    WHERE 
+      MY_TABLE.id = id_u;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+    DBMS_OUTPUT.PUT_LINE('No such number');
+END;
+
+
+CREATE OR REPLACE Procedure DeleteById(id_u INTEGER)
+IS
+BEGIN
+    DELETE
+        student.MY_TABLE
+    WHERE MY_TABLE.id = id_u;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+    DBMS_OUTPUT.PUT_LINE('No such number');
+END;
+
+
+SELECT * FROM student.My_table_without_triggeer;
+
+EXECUTE InsertById(2, 15);
+
+SELECT * FROM student.My_table
+WHERE id >=1 and id <=10;
+
+EXECUTE UpdateById(2, 10);
+
+EXECUTE DeleteById(2);
