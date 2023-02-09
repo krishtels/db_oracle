@@ -7,6 +7,13 @@ CREATE TABLE student.My_table (
     constraint PK_MYTABLE primary key (id)
 )
 
+CREATE TABLE student.My_table_without_triggeer (
+    id INTEGER NOT NULL,   
+    val INTEGER NOT NULL,
+    constraint PK_MYTABLE_WITHOUT_TG primary key (id)
+)
+
+
 CREATE SEQUENCE sq_my_table
 START WITH 1 
 INCREMENT BY 1 
@@ -64,6 +71,20 @@ BEGIN
     RETURN result;
 END;
 
-select IfEven() from dual;
-select COUNT(*) from student.MY_TABLE
-where mod(student.My_table.val, 2) = 0;
+SELECT IfEven() FROM dual;
+SELECT COUNT(*) FROM student.MY_TABLE
+WHERE mod(student.My_table.val, 2) = 0;
+
+CREATE OR REPLACE Function GetInsertComBy(id INTEGER)
+   RETURN VARCHAR2
+IS
+BEGIN
+    return 'INSERT INTO student.My_table_without_triggeer(id, val) VALUES (' || id || ', ' || DBMS_RANDOM.RANDOM() || ')';
+END;
+
+DECLARE
+BEGIN
+   EXECUTE IMMEDIATE GetInsertComBy(15);
+END;
+
+SELECT * FROM student.My_table_without_triggeer;
