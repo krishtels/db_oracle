@@ -30,7 +30,7 @@ END;
 DECLARE
     v NUMBER;
 BEGIN
-    FOR i IN 1..10000
+    FOR i IN 1..10
     LOOP
        v := DBMS_RANDOM.RANDOM();
     INSERT INTO 
@@ -40,7 +40,7 @@ BEGIN
     END LOOP;
 END;
 
-SELECT COUNT(*) FROM student.My_table
+SELECT * FROM student.My_table
 
 
 
@@ -80,17 +80,24 @@ WHERE mod(student.My_table.val, 2) = 0;
 
 
 
-CREATE OR REPLACE Function GetInsertComBy(id INTEGER)
+CREATE OR REPLACE Function GetInsertComBy(cj INTEGER)
    RETURN VARCHAR2
 IS
-BEGIN
-    return 'INSERT INTO student.My_table_without_triggeer(id, val) VALUES (' || id || ', ' || DBMS_RANDOM.RANDOM() || ')';
+d_d INTEGER;
+str_ret VARCHAR2(200);
+BEGIN 
+    SELECT val INTO d_d 
+    FROM student.MY_TABLE WHERE student.MY_TABLE.id = cj;
+    str_ret := 'INSERT student.My_table(id, val) INTO (' || cj || ', ' || d_d || ')';
+    return str_ret;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+    DBMS_OUTPUT.PUT_LINE('rgfvfdbbdf');
+    return 'error';
 END;
 
-DECLARE
-BEGIN
-   EXECUTE IMMEDIATE GetInsertComBy(15);
-END;
+SELECT GetInsertComBy(-123) FROM DUAL
+
 
 SELECT * FROM student.My_table_without_triggeer;
 
@@ -168,3 +175,5 @@ EXCEPTION
     raise_application_error(-20002,'Percent must be between 0 and 100');
 END;
 select Year_income(-10, 1) from DUAL;
+
+-- DROP TABLE student.My_table;
