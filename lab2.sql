@@ -168,3 +168,6 @@ UPDATE student.students SET student.students.group_id=5 WHERE students.id=7;
 DELETE FROM student.students WHERE student.students.id=7;
 
 select * from student.LOGGING_ACTIONS;
+
+
+--TASK 5
