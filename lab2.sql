@@ -76,13 +76,13 @@ EXCEPTION
 END;
 
 CREATE OR REPLACE TRIGGER check_student_id
-BEFORE UPDATE OR INSERT
+BEFORE INSERT
 ON student.students FOR EACH ROW
 DECLARE
 id_ NUMBER;
 existing_id EXCEPTION;
 BEGIN
-        SELECT student.students.id INTO id_ FROM student.students WHERE student.students.id=:NEW.id;
+    SELECT student.students.id INTO id_ FROM student.students WHERE student.students.id=:NEW.id;
         dbms_output.put_line('An id already exists'||:NEW.id);
         raise existing_id;
 EXCEPTION
@@ -110,21 +110,6 @@ INSERT INTO student.STUDENTS (name, group_id) VALUES ('Nikita', 2);
 SELECT * FROM student.STUDENTS;
 
 --TASK 3
-CREATE OR REPLACE TRIGGER fk_student_group
-AFTER DELETE ON student.students FOR EACH ROW
-DECLARE
-   PRAGMA AUTONOMOUS_TRANSACTION;
-   students_amount_in_group NUMBER;
-BEGIN
-    EXECUTE IMMEDIATE 'ALTER TRIGGER fk_group_student DISABLE';
-    EXECUTE IMMEDIATE 'SELECT student.groups.c_val FROM student.groups WHERE id='||:OLD.group_id INTO students_amount_in_group;
-        dbms_output.put_line(students_amount_in_group);
-    IF students_amount_in_group=1 THEN
-        DELETE FROM student.groups WHERE id=:OLD.group_id;
-    END IF;
-    EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group DISABLE';
-END;
-
 CREATE OR REPLACE TRIGGER fk_group_student
 AFTER DELETE ON student.groups FOR EACH ROW
 DECLARE
@@ -141,3 +126,45 @@ select * from student.students;
 DELETE FROM student.groups WHERE id=2;
 
 DELETE FROM student.students WHERE id=1;
+
+
+--TASK 4
+CREATE TABLE student.LOGGING_ACTIONS
+(
+    id NUMBER PRIMARY KEY,
+    operation VARCHAR2(10) NOT NULL,
+    date_exec TIMESTAMP NOT NULL,
+    new_student_id NUMBER,
+    new_student_name VARCHAR2(100),
+    new_studenr_group_id NUMBER,
+    old_student_id NUMBER,
+    old_student_name VARCHAR2(100),
+    old_studenr_group_id NUMBER
+);
+
+
+CREATE OR replace trigger stud_logger 
+AFTER INSERT OR UPDATE OR DELETE 
+ON student.STUDENTS FOR EACH ROW
+DECLARE
+    TEMP_ID NUMBER;
+BEGIN
+    EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM student.LOGGING_ACTIONS' INTO TEMP_ID;
+    CASE
+    WHEN INSERTING THEN
+        INSERT INTO student.LOGGING_ACTIONS VALUES(TEMP_ID+1, 'INSERT', SYSTIMESTAMP, :new.id, :new.name, :new.group_id, NULL, NULL, NULL);
+    WHEN UPDATING THEN
+        INSERT INTO student.LOGGING_ACTIONS VALUES(TEMP_ID+1, 'UPDATE', SYSTIMESTAMP, :new.id, :new.name, :new.group_id, :old.id, :old.name, :old.group_id);
+
+    WHEN DELETING THEN
+        INSERT INTO student.LOGGING_ACTIONS VALUES(TEMP_ID+1, 'DELETE', SYSTIMESTAMP, NULL, NULL, NULL, :old.id, :old.name, :old.group_id);
+    END CASE;
+END;
+
+
+INSERT INTO student.STUDENTS (name, group_id) VALUES ('Dima', 4);
+INSERT INTO student.students (name, group_id) VALUES('Roman', 4);
+UPDATE student.students SET student.students.group_id=5 WHERE students.id=7;
+DELETE FROM student.students WHERE student.students.id=7;
+
+select * from student.LOGGING_ACTIONS;
