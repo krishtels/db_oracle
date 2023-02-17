@@ -110,3 +110,34 @@ INSERT INTO student.STUDENTS (name, group_id) VALUES ('Nikita', 2);
 SELECT * FROM student.STUDENTS;
 
 --TASK 3
+CREATE OR REPLACE TRIGGER fk_student_group
+AFTER DELETE ON student.students FOR EACH ROW
+DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   students_amount_in_group NUMBER;
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER TRIGGER fk_group_student DISABLE';
+    EXECUTE IMMEDIATE 'SELECT student.groups.c_val FROM student.groups WHERE id='||:OLD.group_id INTO students_amount_in_group;
+        dbms_output.put_line(students_amount_in_group);
+    IF students_amount_in_group=1 THEN
+        DELETE FROM student.groups WHERE id=:OLD.group_id;
+    END IF;
+    EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group DISABLE';
+END;
+
+CREATE OR REPLACE TRIGGER fk_group_student
+AFTER DELETE ON student.groups FOR EACH ROW
+DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group DISABLE';
+    EXECUTE IMMEDIATE 'DELETE FROM student.students WHERE student.students.group_id='||:OLD.id;
+     EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group ENABLE';
+END;
+
+
+select * from student.groups;
+select * from student.students;
+DELETE FROM student.groups WHERE id=2;
+
+DELETE FROM student.students WHERE id=1;
