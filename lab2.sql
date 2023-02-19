@@ -171,3 +171,37 @@ select * from student.LOGGING_ACTIONS;
 
 
 --TASK 5
+CREATE OR REPLACE PROCEDURE restore_students(time_back TIMESTAMP) IS
+BEGIN
+    FOR action IN (SELECT * FROM student.LOGGING_ACTIONS WHERE time_back < date_exec ORDER BY id DESC)
+    LOOP
+        IF action.operation = 'INSERT' THEN
+            DELETE student.students WHERE id = action.new_student_id;
+        END IF;
+        
+        IF action.operation = 'UPDATE' THEN
+            UPDATE student.students SET
+            id = action.old_student_id,
+            name = action.old_student_name,
+            group_id = action.old_studenr_group_id
+            WHERE id = action.new_student_id;
+        END IF;
+        
+        IF action.operation = 'DELETE' THEN
+            INSERT INTO student.students VALUES (action.old_student_id, action.old_student_name, action.old_studenr_group_id);
+        END IF;
+    END LOOP;
+END;
+
+SELECT * FROM student.GROUPS;
+SELECT * FROM student.STUDENTS;
+
+INSERT INTO student.students(name, group_id) values('Vanya', 4);
+UPDATE student.students SET student.students.group_id=5 WHERE students.id=3;
+SELECT * FROM student.LOGGING_ACTIONS;
+
+DELETE FROM student.students WHERE name='Vanya';
+EXEC restore_students(TO_TIMESTAMP('19-Feb-02 01.19.05.0000000 PM'));
+EXEC restore_students(TO_TIMESTAMP(CURRENT_TIMESTAMP - 45));
+EXEC restore_students(TO_TIMESTAMP(CURRENT_TIMESTAMP + numToDSInterval( 1, 'second' )));
+
