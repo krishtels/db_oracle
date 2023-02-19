@@ -50,9 +50,11 @@ DECLARE
 id_ NUMBER;
 existing_name EXCEPTION;
 BEGIN
+    if :NEW.name <> :OLD.name THEN
         SELECT student.GROUPS.id INTO id_ FROM student.GROUPS WHERE student.GROUPS.name=:NEW.name;
         dbms_output.put_line('This name already exists'||:NEW.name);
         raise existing_name;
+    END IF;
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
         dbms_output.put_line('successfully inserted!');
@@ -67,9 +69,11 @@ DECLARE
 id_ NUMBER;
 existing_id EXCEPTION;
 BEGIN
+    if :NEW.name <> :OLD.name THEN
         SELECT student.GROUPS.id INTO id_ FROM student.GROUPS WHERE student.GROUPS.id=:NEW.id;
                dbms_output.put_line('An id already exists'||:NEW.id);
         raise existing_id;
+    END IF;
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
         dbms_output.put_line('successfully inserted!');
@@ -205,3 +209,41 @@ EXEC restore_students(TO_TIMESTAMP('19-Feb-02 01.19.05.0000000 PM'));
 EXEC restore_students(TO_TIMESTAMP(CURRENT_TIMESTAMP - 45));
 EXEC restore_students(TO_TIMESTAMP(CURRENT_TIMESTAMP + numToDSInterval( 1, 'second' )));
 
+
+--TASK 6
+CREATE OR REPLACE TRIGGER c_val_update
+    AFTER INSERT OR UPDATE OR DELETE
+    ON student.students
+    for each row
+BEGIN
+    IF INSERTING THEN
+        UPDATE student.groups
+        SET C_VAL = C_VAL + 1
+        WHERE id = :new.group_id;
+    END IF;
+    IF UPDATING THEN
+        UPDATE student.groups
+        SET C_VAL = C_VAL - 1
+        WHERE id = :old.group_id;
+        
+        UPDATE student.groups
+        SET C_VAL = C_VAL + 1
+        WHERE id = :new.group_id;
+    END IF;
+    IF DELETING THEN
+        UPDATE student.groups
+        SET C_VAL = C_VAL - 1
+        WHERE id = :old.group_id;
+    END IF;
+END;
+
+INSERT INTO student.students(name, group_id) values('001', 4);
+INSERT INTO student.students(name, group_id) values('002', 5);
+INSERT INTO student.students(name, group_id) values('003', 5);
+INSERT INTO student.students(name, group_id) values('004', 6);
+
+UPDATE student.STUDENTS SET group_id=6 where id=36;
+DELETE FROM student.STUDENTS WHERE id=37;
+
+SELECT * FROM student.GROUPS;
+SELECT * FROM student.STUDENTS;
