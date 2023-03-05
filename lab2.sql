@@ -50,11 +50,11 @@ DECLARE
 id_ NUMBER;
 existing_name EXCEPTION;
 BEGIN
-    if :NEW.name <> :OLD.name THEN
+   if :NEW.name <> :OLD.name THEN
         SELECT student.GROUPS.id INTO id_ FROM student.GROUPS WHERE student.GROUPS.name=:NEW.name;
         dbms_output.put_line('This name already exists'||:NEW.name);
         raise existing_name;
-    END IF;
+  END IF;
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
         dbms_output.put_line('successfully inserted!');
@@ -114,16 +114,27 @@ INSERT INTO student.STUDENTS (name, group_id) VALUES ('Nikita', 2);
 SELECT * FROM student.STUDENTS;
 
 --TASK 3
+CREATE OR REPLACE TRIGGER fk_student_group
+AFTER DELETE ON student.students FOR EACH ROW
+DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   students_amount_in_group NUMBER;
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER TRIGGER fk_group_student DISABLE';
+    EXECUTE IMMEDIATE 'SELECT student.groups.c_val FROM groups WHERE id='||:OLD.group_id INTO students_amount_in_group;
+        dbms_output.put_line(students_amount_in_group);
+    EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group DISABLE';
+END;
+
 CREATE OR REPLACE TRIGGER fk_group_student
 AFTER DELETE ON student.groups FOR EACH ROW
 DECLARE
    PRAGMA AUTONOMOUS_TRANSACTION;
 BEGIN
   EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group DISABLE';
-    EXECUTE IMMEDIATE 'DELETE FROM student.students WHERE student.students.group_id='||:OLD.id;
+    EXECUTE IMMEDIATE 'DELETE FROM student.students WHERE students.group_id='||:OLD.id;
      EXECUTE IMMEDIATE 'ALTER TRIGGER fk_student_group ENABLE';
 END;
-
 
 select * from student.groups;
 select * from student.students;
@@ -247,3 +258,11 @@ DELETE FROM student.STUDENTS WHERE id=37;
 
 SELECT * FROM student.GROUPS;
 SELECT * FROM student.STUDENTS;
+
+INSERT into student.groups(name, c_val) VALUES ('053505', 0);
+
+DELETE FROM student.GROUPS WHERE id = 4;
+
+SELECT * FROM student.LOGGING_ACTIONS;
+EXEC restore_students(TO_TIMESTAMP('20-Feb-23 01.19.05.0000000 PM'));
+INSERT INTO student.students(name, group_id) values('005', 6);
