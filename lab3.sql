@@ -105,9 +105,9 @@ BEGIN
         CONNECT BY NOCYCLE PRIOR parent_obj = child_obj ORDER BY LEVEL
     ) LOOP
         IF fk_cur.CONNECT_BY_ISCYCLE = 0 THEN
-            dbms_output.put_line(fk_cur.CHILD_OBJ); 
+            dbms_output.put_line(fk_cur.child_obj); 
         ELSE
-            dbms_output.put_line('CYCLE IN TABLE' || fk_cur.CHILD_OBJ); 
+            dbms_output.put_line('CYCLE IN TABLE' || fk_cur.child_obj); 
         END IF;
     END LOOP;
 END scheme_tables_order;
@@ -119,3 +119,79 @@ begin
     SCHEME_TABLES_ORDER('DEV'); 
     SCHEME_TABLES_ORDER('PROD');
 end;
+
+
+-- Task 2
+
+SELECT * FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'TABLE' AND OWNER = 'DEV';
+ 
+
+
+CREATE OR REPLACE PROCEDURE compare_schemes(schema1 in VARCHAR2, schema2 in VARCHAR2)
+AS
+diff NUMBER := 0;
+type objarray IS VARRAY(4) OF VARCHAR2(10); 
+objects_arr objarray; 
+total integer; 
+BEGIN
+-- DIFFERENCE IN COLUMNS
+    objects_arr := OBJARRAY('PROCEDURE', 'PACKAGE', 'INDEX', 'TABLE');
+    total := objects_arr.count;
+    dbms_output.put_line('Comparing 2 schemes, printing difference in tables');
+
+    FOR i IN 1 .. total LOOP
+        FOR same_object IN (
+        SELECT objects1.object_name FROM ALL_OBJECTS objects1 WHERE OWNER = schema1 AND OBJECT_TYPE = objects_arr(i)
+        INTERSECT
+        SELECT objects2.object_name FROM ALL_OBJECTS objects2 WHERE OWNER = schema2 AND OBJECT_TYPE = objects_arr(i)) LOOP
+            SELECT COUNT(*) INTO diff FROM
+            (SELECT table1.COLUMN_NAME name, table1.DATA_TYPE FROM all_tab_columns table1 WHERE OWNER=schema1 AND TABLE_NAME= same_object.object_name) cols1
+            FULL JOIN
+            (SELECT table2.COLUMN_NAME name, table2.DATA_TYPE FROM all_tab_columns table2 WHERE OWNER=schema2 AND TABLE_NAME = same_object.object_name) cols2
+            ON cols1.name = cols2.name
+            WHERE cols1.name IS NULL OR cols2.name IS NULL;
+
+
+    IF diff > 0 THEN
+    dbms_output.put_line(objects_arr(i) || ' structure of ' || same_object.object_name || ' is different in ' || schema1 || ' and ' || schema2);
+    ELSE
+    dbms_output.put_line(objects_arr(i) || ' structure of ' || same_object.object_name || ' the same'); END IF;
+    END LOOP;
+    END LOOP;
+end compare_schemes;
+
+
+CREATE OR REPLACE PROCEDURE compare_schemes_tables (schema1 in VARCHAR2, schema2 in VARCHAR2) AS 
+type objarray IS VARRAY(4) OF VARCHAR2(10); 
+objects_arr objarray; 
+total integer; 
+BEGIN
+    objects_arr := OBJARRAY('PROCEDURE', 'PACKAGE', 'INDEX', 'TABLE');
+    total := objects_arr.count;
+
+    dbms_output.put_line('Comparing 2 schemes, printing difference in tables, procedures, indexes, packets');
+    FOR i IN 1 .. total LOOP
+    FOR other_table IN (SELECT objects1.object_name name FROM ALL_OBJECTS objects1 WHERE OWNER = schema1 AND OBJECT_TYPE = objects_arr(i)
+    MINUS
+    SELECT objects2.object_name FROM ALL_OBJECTS objects2 WHERE OWNER = schema2 AND OBJECT_TYPE = objects_arr(i)) LOOP
+        dbms_output.put_line(objects_arr(i) || ' ' || other_table.name || ' is in ' || schema1 || ' but not in ' || schema2);
+    END LOOP;
+    END LOOP;
+
+    FOR i IN 1 .. total LOOP
+    FOR other_table IN (select objects2.object_name name FROM ALL_OBJECTS objects2 WHERE OWNER = schema2 AND OBJECT_TYPE = objects_arr(i)
+    MINUS
+    SELECT objects1.object_name FROM ALL_OBJECTS objects1 WHERE OWNER = schema1 AND OBJECT_TYPE = objects_arr(i)) LOOP
+        dbms_output.put_line(objects_arr(i) || ' ' || other_table.name || ' is in ' || schema2 || ' but not in ' || schema1);
+    END LOOP;
+    END LOOP;
+end compare_schemes_tables;
+ 
+
+begin
+COMPARE_SCHEMES('DEV', 'PROD'); 
+COMPARE_SCHEMES_TABLES('DEV', 'PROD'); 
+SCHEME_TABLES_ORDER('DEV'); 
+SCHEME_TABLES_ORDER('PROD');
+end;
+
