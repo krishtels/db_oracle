@@ -1,4 +1,14 @@
 -- create users
+DROP USER dev;
+DROP PROCEDURE dev.remove_products;
+DROP TABLE dev.PRODUCTS;
+DROP TABLE dev.users;
+
+DROP USER prod;
+DROP PROCEDURE prod.remove_products;
+DROP TABLE prod.PRODUCTS;
+
+
 CREATE USER dev IDENTIFIED BY password;
 CREATE USER prod IDENTIFIED BY password;
 GRANT ALL PRIVILEGES TO dev;
@@ -18,6 +28,11 @@ CREATE TABLE dev.users(
     CONSTRAINT user_pk PRIMARY KEY (user_id)
 );
 
+CREATE OR REPLACE PROCEDURE dev.remove_products (product_id NUMBER) AS
+   BEGIN
+      DELETE FROM dev.PRODUCTS
+      WHERE  dev.PRODUCTS.PRODUCT_ID = product_id;
+   END;
 
 -- create prod schema
 CREATE TABLE prod.products( 
@@ -194,4 +209,132 @@ COMPARE_SCHEMES_TABLES('DEV', 'PROD');
 SCHEME_TABLES_ORDER('DEV'); 
 SCHEME_TABLES_ORDER('PROD');
 end;
+
+
+-- Task 3
+SELECT * FROM ALL_SOURCE WHERE OWNER = 'DEV';
+
+CREATE OR REPLACE PROCEDURE REPLACE_OBJECT (schema1 IN VARCHAR2, schema2 IN VARCHAR2, object_type IN VARCHAR2, object_name IN VARCHAR2) 
+AS
+query_string VARCHAR2(4000); 
+BEGIN
+    query_string := '';
+    FOR src IN (SELECT line, text FROM ALL_SOURCE WHERE OWNER = schema1 AND NAME = object_name) LOOP
+        IF src.line =1 THEN
+            query_string := 'CREATE OR REPLACE ' || REPLACE(src.text, LOWER(object_name), schema2 || '.' || object_name);
+        ELSE
+            query_string := query_string || src.text; END IF;
+    END LOOP;
+    IF LENGTH( query_string ) > 0 THEN
+        EXECUTE IMMEDIATE query_string; 
+    END IF;
+END REPLACE_OBJECT;
+
+
+CREATE OR REPLACE PROCEDURE CREATE_OBJECT (schema1 IN VARCHAR2, schema2 IN VARCHAR2, object_type IN VARCHAR2, object_name IN VARCHAR2) 
+AS
+query_string VARCHAR2(4000); 
+BEGIN
+    query_string := '';
+    FOR src IN (SELECT line, text FROM ALL_SOURCE WHERE OWNER = schema1 AND NAME = object_name) LOOP
+        IF src.line =1 THEN
+            query_string := 'CREATE ' || REPLACE(src.text, LOWER(object_name), schema2 || '.' || object_name);
+        ELSE
+            query_string := query_string || src.text; 
+        END IF;
+    END LOOP;
+    IF LENGTH( query_string ) > 0 THEN
+        EXECUTE IMMEDIATE query_string; 
+    END IF;
+END CREATE_OBJECT;
+
+
+CREATE OR REPLACE PROCEDURE DELETE_OBJECT (schema1 IN VARCHAR2, object_type IN VARCHAR2, object_name IN VARCHAR2)
+AS
+delete_query VARCHAR(1000); 
+BEGIN
+    delete_query := '';
+    delete_query := 'DROP ' || object_type || ' ' || schema1 || '.' || object_name; 
+    IF LENGTH( delete_query ) > 0 THEN
+        EXECUTE IMMEDIATE delete_query; 
+    END IF;
+
+END DELETE_OBJECT;
+
+
+
+CREATE OR REPLACE PROCEDURE COMPARE_OBJECTS (schema1 IN VARCHAR2, schema2 IN VARCHAR2, object_type IN VARCHAR2) AS
+diff NUMBER :=0; 
+query_string VARCHAR(32767); 
+BEGIN
+    FOR pair IN (SELECT obj1.NAME AS name1, obj2.NAME AS name2 FROM
+        (SELECT OBJECT_NAME name FROM ALL_OBJECTS WHERE OBJECT_TYPE = object_type AND OWNER = schema1) obj1 
+        FULL JOIN
+        (SELECT OBJECT_NAME name FROM ALL_OBJECTS WHERE OBJECT_TYPE = object_type AND OWNER = schema2) obj2 
+        ON obj1.name = obj2.name) 
+    LOOP
+        IF object_type = 'PROCEDURE' THEN
+            IF pair.name1 IS NULL THEN
+                DELETE_OBJECT(schema2,object_type, pair.name2); 
+                dbms_output.put_line('D');
+            ELSIF pair.name2 IS NULL THEN
+                CREATE_OBJECT(schema1, schema2, object_type, pair.name1); 
+                dbms_output.put_line('C');
+            ELSE
+                SELECT COUNT(*) INTO diff FROM all_source src1 
+                FULL JOIN all_source src2 
+                ON src1.name = src2.name
+                WHERE src1.name= pair.name1 AND src1.line = src2.line AND src1.text != src2.text
+                AND src1.OWNER = schema1 AND src2.OWNER = schema2;
+                IF diff > 0 THEN 
+                    REPLACE_OBJECT(schema1,schema2,object_type,pair.name1); 
+                    dbms_output.put_line('R');
+                END IF; 
+            END IF;
+        ELSIF object_type = 'TABLE' THEN
+            IF pair.name1 IS NULL THEN
+                query_string := 'DROP TABLE ' || schema2 || '.' || pair.name2;
+                EXECUTE IMMEDIATE query_string; 
+                dbms_output.put_line('D');
+            ELSIF pair.name2 IS NULL THEN
+                query_string := REPLACE (DBMS_LOB.SUBSTR (DBMS_METADATA.get_ddl ('TABLE', pair.name1, schema1)), schema1, schema2);
+                EXECUTE IMMEDIATE query_string; 
+                dbms_output.put_line('C');
+            END IF; 
+
+        END IF;
+    END LOOP;
+    IF object_type = 'TABLE' THEN 
+        FOR same_table IN 
+        (SELECT table_name FROM all_tables tables1 WHERE OWNER = schema1
+        INTERSECT
+        SELECT tables2.table_name FROM all_tables tables2 WHERE OWNER = schema2) LOOP
+            SELECT COUNT(*) INTO diff FROM
+            (SELECT table1.COLUMN_NAME name, table1.DATA_TYPE FROM all_tab_columns table1 WHERE OWNER=schema1 
+            AND TABLE_NAME = same_table.table_name) cols1
+            FULL JOIN
+            (SELECT table2.COLUMN_NAME name, table2.DATA_TYPE FROM all_tab_columns table2 WHERE OWNER=schema2 
+            AND TABLE_NAME = same_table.table_name) cols2
+            ON cols1.name = cols2.name
+            WHERE cols1.name IS NULL OR cols2.name IS NULL;
+
+        IF diff > 0 THEN
+            query_string := 'DROP TABLE ' || schema2 || '.' || same_table.table_name;
+            EXECUTE IMMEDIATE query_string; 
+            query_string := REPLACE (DBMS_LOB.SUBSTR (DBMS_METADATA.get_ddl ('TABLE', same_table.table_name, schema1)), schema1, schema2);
+            EXECUTE IMMEDIATE query_string; 
+        END IF;
+        END LOOP;
+    END IF;
+END COMPARE_OBJECTS;
+
+
+begin
+COMPARE_SCHEMES('DEV', 'PROD'); 
+COMPARE_SCHEMES_TABLES('DEV', 'PROD'); 
+end;
+
+EXEC COMPARE_OBJECTS('DEV', 'PROD', 'PROCEDURE');
+EXEC COMPARE_OBJECTS('DEV', 'PROD', 'TABLE');
+
 
