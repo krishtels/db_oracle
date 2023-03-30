@@ -137,12 +137,12 @@ CREATE OR REPLACE PACKAGE BODY PACKAGE4 AS
                 || ' ON '
                 || JOIN_CONDITION;
         END LOOP;
-        SELECT
-            EXTRACT(XMLTYPE(XML_STRING), 'Operation/Where').GETSTRINGVAL() INTO WHERE_QUERY
-        FROM
-            DUAL;
+        -- SELECT
+        --     EXTRACT(XMLTYPE(XML_STRING), 'Operation/Where').GETSTRINGVAL() INTO WHERE_QUERY
+        -- FROM
+        --     DUAL;
         SELECT_QUERY := SELECT_QUERY
-            || PROCESS_WHERE(WHERE_QUERY);
+            || PROCESS_WHERE(XML_STRING);
         -- DBMS_OUTPUT.PUT_LINE(SELECT_QUERY);
         RETURN SELECT_QUERY;
     END PROCESS_OPERATOR;
@@ -167,6 +167,7 @@ CREATE OR REPLACE PACKAGE BODY PACKAGE4 AS
                 'Condition/Body') INTO CONDITION_BODY
             FROM
                 DUAL;
+            -- DBMS_OUTPUT.PUT_LINE(TRIM(CONDITION_BODY));
             SELECT
                 EXTRACT(XMLTYPE(WHERE_FILTER(I)),
                 'Condition/Operation').GETSTRINGVAL() INTO SUB_QUERY
@@ -516,3 +517,25 @@ CREATE TABLE XMLTEST2
 SELECT * FROM XMLTEST2;
 
 INSERT INTO XMLTEST2 VALUES (2);
+
+DECLARE
+    INPUT_DATA VARCHAR2(1000) := '<Operation>
+    <Type>SELECT</Type>
+    <Tables>
+        <Table>XMLTEST3</Table>
+    </Tables>
+    <Columns>
+        <Column>XMLTEST3.ID</Column>
+        <Column>XMLTEST3.NAME</Column>
+    </Columns>
+    <Where>
+        <Conditions>
+            <Condition>
+                <Body>XMLTEST3.NAME LIKE "text"</Body>
+            </Condition>
+        </Conditions>
+    </Where>
+</Operation>';
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(PACKAGE4.PROCESS_OPERATOR(INPUT_DATA));
+END;
