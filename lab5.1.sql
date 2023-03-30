@@ -371,7 +371,10 @@ BEGIN
 END;
 
 
+
+
 CREATE OR REPLACE PROCEDURE RESTORE_DATA(INPUT_TABLES IN STRING_ARRAY, INPUT_TS IN TIMESTAMP ) IS
+
 BEGIN
     FOR I IN 1..INPUT_TABLES.COUNT LOOP
         EXECUTE IMMEDIATE '
@@ -386,13 +389,32 @@ BEGIN
     END LOOP;
 END;
 
+
+CREATE OR REPLACE PROCEDURE RESTORE_DATA1(INPUT_TABLES IN STRING_ARRAY, INPUT_TS IN NUMBER ) IS
+TS VARCHAR2(1000);
+BEGIN
+    FOR I IN 1..INPUT_TABLES.COUNT LOOP
+        EXECUTE IMMEDIATE '
+        BEGIN
+            RESTORE_'
+            || INPUT_TABLES(I)
+            || '(TO_TIMESTAMP('''
+            || TO_CHAR(CURRENT_TIMESTAMP - INPUT_TS, 'DD-MM-YYYY HH:MI:SS')
+            || ''', ''DD-MM-YYYYHH:MI:SS''));
+        END;
+        ';
+    END LOOP;
+
+END;
+
+
 CREATE OR REPLACE PROCEDURE RESTORE_CHILD ( TABLE_NAME IN VARCHAR2, RESTORE_UNTIL TIMESTAMP ) IS CHILD_ARRAY STRING_ARRAY;
 BEGIN
     CHILD_ARRAY := GET_DEPENDENT_TABLES(TABLE_NAME);
     RESTORE_DATA(CHILD_ARRAY, RESTORE_UNTIL);
 END;
 
-INSERT INTO DEV.TABLE1(TESTCOLUMN) VALUES ('TEST1');
+INSERT INTO DEV.TABLE1(TESTCOLUMN) VALUES ('TEST5');
 INSERT INTO DEV.TABLE2(TESTCOLUMN) VALUES(CURRENT_DATE);
 INSERT INTO DEV.TABLE3(TESTCOLUMN, TABLE2_ID) VALUES (1, 2);
 UPDATE DEV.TABLE1 SET TESTCOLUMN = 'TESTED2';
@@ -417,61 +439,183 @@ UPDATE DEV.TABLE1_AUDIT SET IS_REVERTED = 0;
 DECLARE
     TABLES STRING_ARRAY := STRING_ARRAY('TABLE1', 'TABLE2', 'TABLE3');
 BEGIN
-    RESTORE_DATA(TABLES, '30-MAR-23 3.15.00.000000000 PM');
+    RESTORE_DATA(TABLES, '30-MAR-23 9.15.00.000000000 PM');
 END;
 
+DECLARE
+    TABLES STRING_ARRAY := STRING_ARRAY('TABLE1');
+BEGIN
+    RESTORE_DATA1(TABLES, 10);
+END;
+
+CREATE OR REPLACE DIRECTORY my_dir AS 'D:\labs\db_oracle';
 
 
--- CREATE OR REPLACE FUNCTION HTML_CREATE( TABLE_NAMES IN STRING_ARRAY, TS IN TIMESTAMP ) RETURN VARCHAR2 
--- IS 
---     HTML_DOCUMENT VARCHAR2( 500 ) := '<!DOCTYPE html>
---         <html>
---         <head>
---             <title>Title</title>
---         </head>
---         <body>
---     ';
---     OPERATION_COUNT NUMBER;
---     SYS_REF_C SYS_REFCURSOR;
---     OPERATION_NAME VARCHAR( 20 );
--- BEGIN
---     FOR I IN 1..TABLE_NAMES.COUNT LOOP
---         HTML_DOCUMENT := HTML_DOCUMENT
---             || '<h1>'
---             || TABLE_NAMES(I)
---             || '</h1>';
---         OPEN SYS_REF_C FOR '
---             SELECT operation, COUNT(*) FROM '
---             || TABLE_NAMES(I)
---             || '_AUDIT 
---             WHERE is_reverted = 0 AND change_time > TO_TIMESTAMP(
---                 '''
---             || TO_CHAR(TS, 'DD-MM-YYYY HH:MI:SS')
---             || ''', 
---                 ''DD-MM-YYYYHH:MI:SS''
---             ) GROUP BY operation
---         ';
---         LOOP
---             FETCH SYS_REF_C INTO OPERATION_NAME, OPERATION_COUNT;
---             EXIT WHEN SYS_REF_C%NOTFOUND;
---             HTML_DOCUMENT := HTML_DOCUMENT
---                 || '<p>'
---                 || OPERATION_NAME
---                 || ':'
---                 || OPERATION_COUNT
---                 || '</p>';
---         END LOOP;
---         CLOSE SYS_REF_C;
---     END LOOP;
---     HTML_DOCUMENT := HTML_DOCUMENT
---         || '</body></html>';
---     RETURN HTML_DOCUMENT;
--- END;
+CREATE OR REPLACE NONEDITIONABLE PACKAGE "REPORTS" as
+  procedure get_report(TS in timestamp);
+  procedure get_report;
+end;
 
--- DECLARE
---     TABLES STRING_ARRAY := STRING_ARRAY('DEV.TABLE1', 'DEV.TABLE2', 'DEV.TABLE3');
---     HTML VARCHAR2(1000);
--- BEGIN
---     SELECT HTML_CREATE(TABLES, '29-MAR-23 3.00.00.000000000 PM') INTO HTML FROM DUAL;
---     DBMS_OUTPUT.PUT_LINE(HTML);
--- END;
+CREATE OR REPLACE NONEDITIONABLE PACKAGE BODY "REPORTS" as
+last_date TIMESTAMP := SYSTIMESTAMP;  
+PROCEDURE GET_REPORT(TS IN TIMESTAMP)
+IS 
+    l_clob VARCHAR2(32767);
+    file_id UTL_FILE.file_type;
+begin
+      l_clob := '
+        <html>
+            <head>
+                <style>
+                table, th, td {
+                    border: 1px solid black;
+                    border-collapse: collapse;
+                }
+                table.center {
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+                </style>
+            </head>
+            <body>
+            <h1 style="text-align: center"> Operation list since' || TS ||'</h1> <table style="width:100%" class="center"> ';
+            
+            l_clob := l_clob || '
+            <h1 align="center"> TABLE1 INFO</h1> 
+            <table> 
+            <tr align="center">
+                <th align="center">OPERATION</th>
+                <th align="center">RECORDED ON </th>
+            </tr>';
+            for l_rec in (select * from DEV.TABLE1_LOGGING_ACTIONS where DATE_EXEC >  TS and IS_REVERTED = 0) loop
+                    l_clob := l_clob || 
+                    '<tr align="center"> <td align="left">'|| 
+                    l_rec.operation ||'</td> <td align="center">' 
+                    ||l_rec.DATE_EXEC || '</td> </tr>';
+            end loop;
+            l_clob := l_clob || '</table>';
+        
+
+            l_clob := l_clob || '
+            <h1 align="center"> TABLE2 INFO</h1> 
+            <table> 
+            <tr align="center">
+                <th align="center">OPERATION</th>
+                <th align="center">RECORDED ON </th>
+            </tr>';
+            for l_rec in (select * from DEV.TABLE2_LOGGING_ACTIONS where DATE_EXEC >  TS and IS_REVERTED = 0) loop
+                    l_clob := l_clob || 
+                    '<tr align="center"> <td align="left">'|| 
+                    l_rec.operation ||'</td> <td align="center">' 
+                    ||l_rec.DATE_EXEC || '</td> </tr>';
+            end loop;
+            l_clob := l_clob || '</table>';
+
+
+            l_clob := l_clob || '
+            <h1 align="center"> TABLE3 INFO</h1> 
+            <table> 
+            <tr align="center">
+                <th align="center">OPERATION</th>
+                <th align="center">RECORDED ON </th>
+            </tr>';
+            for l_rec in (select * from DEV.TABLE3_LOGGING_ACTIONS where DATE_EXEC >  TS and IS_REVERTED = 0) loop
+                    l_clob := l_clob || 
+                    '<tr align="center"> <td align="left">'|| 
+                    l_rec.operation ||'</td> <td align="center">' 
+                    ||l_rec.DATE_EXEC || '</td> </tr>';
+            end loop;
+            l_clob := l_clob || '</table>';
+
+    l_clob := l_clob || '</body></html>';
+    file_id := UTL_FILE.FOPEN ('MY_DIR', 'feedback.html', 'W');
+    UTL_FILE.PUT_LINE(file_id,l_clob);
+    UTL_FILE.fclose (file_id);
+end;
+ 
+
+PROCEDURE GET_REPORT
+IS 
+    l_clob VARCHAR2(32767);
+    file_id UTL_FILE.file_type;
+begin
+      l_clob := '
+        <html>
+            <head>
+                <style>
+                table, th, td {
+                    border: 1px solid black;
+                    border-collapse: collapse;
+                }
+                table.center {
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+                </style>
+            </head>
+            <body>
+            <h1 style="text-align: center"> Operation list since' || last_date ||'</h1> <table style="width:100%" class="center"> ';
+            
+            l_clob := l_clob || '
+            <h1 align="center"> TABLE1 INFO</h1> 
+            <table> 
+            <tr align="center">
+                <th align="center">OPERATION</th>
+                <th align="center">RECORDED ON </th>
+            </tr>';
+            for l_rec in (select * from DEV.TABLE1_LOGGING_ACTIONS where DATE_EXEC >  last_date and IS_REVERTED = 0) loop
+                    l_clob := l_clob || 
+                    '<tr align="center"> <td align="left">'|| 
+                    l_rec.operation ||'</td> <td align="center">' 
+                    ||l_rec.DATE_EXEC || '</td> </tr>';
+            end loop;
+            l_clob := l_clob || '</table>';
+        
+
+            l_clob := l_clob || '
+            <h1 align="center"> TABLE2 INFO</h1> 
+            <table> 
+            <tr align="center">
+                <th align="center">OPERATION</th>
+                <th align="center">RECORDED ON </th>
+            </tr>';
+            for l_rec in (select * from DEV.TABLE2_LOGGING_ACTIONS where DATE_EXEC >  last_date and IS_REVERTED = 0) loop
+                    l_clob := l_clob || 
+                    '<tr align="center"> <td align="left">'|| 
+                    l_rec.operation ||'</td> <td align="center">' 
+                    ||l_rec.DATE_EXEC || '</td> </tr>';
+            end loop;
+            l_clob := l_clob || '</table>';
+
+
+            l_clob := l_clob || '
+            <h1 align="center"> TABLE3 INFO</h1> 
+            <table> 
+            <tr align="center">
+                <th align="center">OPERATION</th>
+                <th align="center">RECORDED ON </th>
+            </tr>';
+            for l_rec in (select * from DEV.TABLE3_LOGGING_ACTIONS where DATE_EXEC >  last_date and IS_REVERTED = 0) loop
+                    l_clob := l_clob || 
+                    '<tr align="center"> <td align="left">'|| 
+                    l_rec.operation ||'</td> <td align="center">' 
+                    ||l_rec.DATE_EXEC || '</td> </tr>';
+            end loop;
+            l_clob := l_clob || '</table>';
+
+    l_clob := l_clob || '</body></html>';
+    file_id := UTL_FILE.FOPEN ('MY_DIR', 'feedback.html', 'W');
+    UTL_FILE.PUT_LINE(file_id,l_clob);
+    UTL_FILE.fclose (file_id);
+    last_date := SYSTIMESTAMP; 
+end;
+end;
+
+
+BEGIN
+    REPORTS.GET_REPORT('30-MAR-23 3.15.00.000000000 PM');
+END;
+
+BEGIN
+    REPORTS.GET_REPORT();
+END;
