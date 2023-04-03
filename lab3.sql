@@ -3,10 +3,13 @@ DROP USER dev;
 DROP PROCEDURE dev.remove_products;
 DROP TABLE dev.PRODUCTS;
 DROP TABLE dev.users;
+DROP TABLE dev.examples;
 
 DROP USER prod;
 DROP PROCEDURE prod.remove_products;
 DROP TABLE prod.PRODUCTS;
+DROP TABLE prod.users;
+DROP TABLE prod.examples;
 
 
 CREATE USER dev IDENTIFIED BY password;
@@ -28,11 +31,28 @@ CREATE TABLE dev.users(
     CONSTRAINT user_pk PRIMARY KEY (user_id)
 );
 
+CREATE TABLE dev.examples ( 
+    ex_id NUMBER(10) not null, 
+    
+    CONSTRAINT ex_pk PRIMARY KEY (ex_id),
+    CONSTRAINT fk_ex FOREIGN KEY (ex_id) REFERENCES dev.examples(ex_id)
+);
+
+
+
 CREATE OR REPLACE PROCEDURE dev.remove_products (product_id NUMBER) AS
    BEGIN
       DELETE FROM dev.PRODUCTS
       WHERE  dev.PRODUCTS.PRODUCT_ID = product_id;
    END;
+
+
+CREATE OR REPLACE PROCEDURE prod.remove_dhd (product_id NUMBER) AS
+   BEGIN
+      DELETE FROM prod.PRODUCTS
+      WHERE  prod.PRODUCTS.PRODUCT_ID = product_id;
+   END;
+
 
 -- create prod schema
 CREATE TABLE prod.products( 
@@ -41,6 +61,10 @@ CREATE TABLE prod.products(
 	category VARCHAR2(50),
     CONSTRAINT products_pk PRIMARY KEY (product_id)
 );
+drop index dev.prod_produts_name;
+
+CREATE INDEX dev.prod_produts_name 
+ON dev.products(product_name);
 
 SET SERVEROUTPUT ON;
 
@@ -210,6 +234,10 @@ SCHEME_TABLES_ORDER('DEV');
 SCHEME_TABLES_ORDER('PROD');
 end;
 
+begin
+COMPARE_SCHEMES_TABLES('PROD', 'DEV'); 
+end;
+
 
 -- Task 3
 SELECT * FROM ALL_SOURCE WHERE OWNER = 'DEV';
@@ -227,6 +255,7 @@ BEGIN
     END LOOP;
     IF LENGTH( query_string ) > 0 THEN
         EXECUTE IMMEDIATE query_string; 
+        dbms_output.put_line(query_string);
     END IF;
 END REPLACE_OBJECT;
 
@@ -245,6 +274,7 @@ BEGIN
     END LOOP;
     IF LENGTH( query_string ) > 0 THEN
         EXECUTE IMMEDIATE query_string; 
+        dbms_output.put_line(query_string);
     END IF;
 END CREATE_OBJECT;
 
@@ -256,7 +286,8 @@ BEGIN
     delete_query := '';
     delete_query := 'DROP ' || object_type || ' ' || schema1 || '.' || object_name; 
     IF LENGTH( delete_query ) > 0 THEN
-        EXECUTE IMMEDIATE delete_query; 
+        EXECUTE IMMEDIATE delete_query;
+        dbms_output.put_line(delete_query); 
     END IF;
 
 END DELETE_OBJECT;
@@ -294,11 +325,13 @@ BEGIN
         ELSIF object_type = 'TABLE' THEN
             IF pair.name1 IS NULL THEN
                 query_string := 'DROP TABLE ' || schema2 || '.' || pair.name2;
-                EXECUTE IMMEDIATE query_string; 
+                EXECUTE IMMEDIATE query_string;
+                dbms_output.put_line(query_string); 
                 dbms_output.put_line('D');
             ELSIF pair.name2 IS NULL THEN
                 query_string := REPLACE (DBMS_LOB.SUBSTR (DBMS_METADATA.get_ddl ('TABLE', pair.name1, schema1)), schema1, schema2);
                 EXECUTE IMMEDIATE query_string; 
+                dbms_output.put_line(query_string);
                 dbms_output.put_line('C');
             END IF; 
 
@@ -321,8 +354,10 @@ BEGIN
         IF diff > 0 THEN
             query_string := 'DROP TABLE ' || schema2 || '.' || same_table.table_name;
             EXECUTE IMMEDIATE query_string; 
+            dbms_output.put_line(query_string);
             query_string := REPLACE (DBMS_LOB.SUBSTR (DBMS_METADATA.get_ddl ('TABLE', same_table.table_name, schema1)), schema1, schema2);
             EXECUTE IMMEDIATE query_string; 
+            dbms_output.put_line(query_string);
         END IF;
         END LOOP;
     END IF;
@@ -336,5 +371,6 @@ end;
 
 EXEC COMPARE_OBJECTS('DEV', 'PROD', 'PROCEDURE');
 EXEC COMPARE_OBJECTS('DEV', 'PROD', 'TABLE');
+
 
 

@@ -1,0 +1,44 @@
+<Operation>
+    <Type>SELECT</Type>
+    <Tables>
+        <Table>XMLTEST1</Table>
+        <Table>XMLTEST2</Table>
+    </Tables>
+    <Joins>
+        <Join>
+            <Type>LEFT JOIN</Type>
+            <Condition>XMLTEST1.ID = XMLTEST2.ID</Condition>
+        </Join>
+    </Joins>
+    <Columns>
+        <Column>XMLTEST1.ID</Column>
+        <Column>XMLTEST2.ID</Column>
+    </Columns>
+    <Where>
+        <Conditions>
+            <Condition>
+                <Body>XMLTEST1.ID = 1</Body>
+                <ConditionOperator>AND</ConditionOperator>
+            </Condition>
+            <Condition>
+                <Body>EXISTS</Body>
+                <Operation>
+                    <Type>SELECT</Type>
+                    <Tables>
+                        <Table>XMLTEST1</Table>
+                    </Tables>
+                    <Columns>
+                        <Column>ID</Column>
+                    </Columns>
+                    <Where>
+                        <Conditions>
+                            <Condition>
+                                <Body>ID = 1</Body>
+                            </Condition>
+                        </Conditions>
+                    </Where>
+                </Operation>
+            </Condition>
+        </Conditions>
+    </Where>
+</Operation>

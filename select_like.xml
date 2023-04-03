@@ -1,0 +1,19 @@
+<Operation>
+    <Type>SELECT</Type>
+    <Tables>
+        <Table>XMLTEST3</Table>
+    </Tables>
+    <Joins>
+    </Joins>
+    <Columns>
+        <Column>XMLTEST3.ID</Column>
+        <Column>XMLTEST3.NAME</Column>
+    </Columns>
+    <Where>
+        <Conditions>
+            <Condition>
+                <Body>XMLTEST3.NAME LIKE 'text'</Body>
+            </Condition>
+        </Conditions>
+    </Where>
+</Operation>
