@@ -151,9 +151,15 @@ CREATE OR REPLACE PACKAGE BODY PACKAGE4 AS
         WHERE_FILTER        XML_RECORD := XML_RECORD();
         WHERE_CLOUSE        VARCHAR2(1000) := ' WHERE ';
         CONDITION_BODY      VARCHAR2(100);
+        CONDITION_OPERATOR  VARCHAR2(100);
+        ARGUMENTS          VARCHAR2(1000);
+        ARGUMENTS_START          VARCHAR2(10);
+        ARGUMENTS_END          VARCHAR2(10);
+        ARGUMENTS_SEPARATOR          VARCHAR2(10);
+        XML_VALUES             XML_RECORD := XML_RECORD();
         SUB_QUERY           VARCHAR2(1000);
         SUB_QUERY1          VARCHAR2(1000);
-        CONDITION_OPERATOR  VARCHAR2(100);
+        SEPARATOR           VARCHAR2(100);
         I                   NUMBER := 1;
         FILTERS             XML_RECORD := XML_RECORD();
         CONCAT_OPERAND      XML_RECORD := XML_RECORD();
@@ -167,15 +173,44 @@ CREATE OR REPLACE PACKAGE BODY PACKAGE4 AS
                 'Condition/Body') INTO CONDITION_BODY
             FROM
                 DUAL;
+            SELECT
+                EXTRACTVALUE(XMLTYPE(WHERE_FILTER(I)),
+                'Condition/Operator') INTO CONDITION_OPERATOR
+            FROM
+                DUAL;
+            SELECT
+                EXTRACT(XMLTYPE(WHERE_FILTER(I)),
+                'Condition/Arguments').GETSTRINGVAL() INTO ARGUMENTS
+            FROM
+                DUAL;
+            
             -- DBMS_OUTPUT.PUT_LINE(TRIM(CONDITION_BODY));
             SELECT
                 EXTRACT(XMLTYPE(WHERE_FILTER(I)),
                 'Condition/Operation').GETSTRINGVAL() INTO SUB_QUERY
             FROM
                 DUAL;
+
             SELECT
                 EXTRACTVALUE(XMLTYPE(WHERE_FILTER(I)),
-                'Condition/ConditionOperator') INTO CONDITION_OPERATOR
+                'Condition/ArgumentsStart') INTO ARGUMENTS_START
+            FROM
+                DUAL;
+            
+            SELECT
+                EXTRACTVALUE(XMLTYPE(WHERE_FILTER(I)),
+                'Condition/ArgumentsEnd') INTO ARGUMENTS_END
+            FROM
+                DUAL;
+
+            SELECT
+                EXTRACTVALUE(XMLTYPE(WHERE_FILTER(I)),
+                'Condition/ArgumentsSeparator') INTO ARGUMENTS_SEPARATOR
+            FROM
+                DUAL;
+            SELECT
+                EXTRACTVALUE(XMLTYPE(WHERE_FILTER(I)),
+                'Condition/Separator') INTO SEPARATOR
             FROM
                 DUAL;
             SUB_QUERY1 := PROCESS_OPERATOR(SUB_QUERY);
@@ -184,13 +219,33 @@ CREATE OR REPLACE PACKAGE BODY PACKAGE4 AS
                     || SUB_QUERY1
                     || ')';
             END IF;
+            
             WHERE_CLOUSE := WHERE_CLOUSE
                 || ' '
                 || TRIM(CONDITION_BODY)
                 || ' '
+                || TRIM(CONDITION_OPERATOR);
+
+            IF ARGUMENTS IS NOT NULL THEN
+            XML_VALUES := EXTRACT_VALUES(ARGUMENTS, 'Arguments/Argument');
+            WHERE_CLOUSE := WHERE_CLOUSE
+                || ARGUMENTS_START
+                || ' '
+                || XML_VALUES(1);
+            FOR I IN 2..XML_VALUES.COUNT LOOP
+                WHERE_CLOUSE := WHERE_CLOUSE
+                    || ' '
+                    || ARGUMENTS_SEPARATOR
+                    || ' '
+                    || XML_VALUES(I);
+            END LOOP;
+             WHERE_CLOUSE := WHERE_CLOUSE
+                || ' ' || ARGUMENTS_END || ' ';
+            END IF;
+            WHERE_CLOUSE := WHERE_CLOUSE
                 || SUB_QUERY1
                 || ' '
-                || CONDITION_OPERATOR
+                || SEPARATOR
                 || ' ';
         END LOOP;
 
@@ -513,6 +568,19 @@ CREATE TABLE XMLTEST2
     id INTEGER NOT NULL
 );
 
+CREATE TABLE TEST1
+(
+    id INTEGER NOT NULL,
+    name VARCHAR2(10),
+    numb NUMBER
+);
+
+CREATE TABLE TEST2
+(
+    id INTEGER NOT NULL,
+    name VARCHAR2(10),
+    numb NUMBER
+);
 
 SELECT * FROM XMLTEST2;
 
@@ -532,6 +600,108 @@ DECLARE
         <Conditions>
             <Condition>
                 <Body>XMLTEST3.NAME LIKE "text"</Body>
+            </Condition>
+        </Conditions>
+    </Where>
+</Operation>';
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(PACKAGE4.PROCESS_OPERATOR(INPUT_DATA));
+END;
+
+
+
+DECLARE
+    INPUT_DATA VARCHAR2(3000) := '<Operation>
+    <Type>SELECT</Type>
+    <Tables>
+        <Table>TEST1</Table>
+    </Tables>
+    <Columns>
+        <Column>TEST1.ID</Column>
+        <Column>TEST1.NUMB</Column>
+    </Columns>
+    <Where>
+        <Conditions>
+            <Condition>
+                <Body>TEST1.ID IN</Body>
+                <Operation>
+                    <Type>SELECT</Type>
+                    <Tables>
+                        <Table>TEST2</Table>
+                    </Tables>
+                    <Columns>
+                        <Column>ID</Column>
+                    </Columns>
+                    <Where>
+                        <Conditions>
+                            <Condition>
+                                <Body>TEST2.NAME LIKE "%a%"</Body>
+                                <ConditionOperator>AND</ConditionOperator>
+                            </Condition>
+                            <Condition>
+                                <Body>TEST2.NUMB BETWEEN 10 AND 15</Body>
+                            </Condition>
+                        </Conditions>
+                    </Where>
+                </Operation>
+            </Condition>
+        </Conditions>
+    </Where>
+</Operation>';
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(PACKAGE4.PROCESS_OPERATOR(INPUT_DATA));
+END;
+
+
+
+DECLARE
+    INPUT_DATA VARCHAR2(3000) := '<Operation>
+    <Type>SELECT</Type>
+    <Tables>
+        <Table>XMLTEST3</Table>
+    </Tables>
+    <Joins>
+    </Joins>
+    <Columns>
+        <Column>XMLTEST3.ID</Column>
+        <Column>XMLTEST3.NAME</Column>
+    </Columns>
+    <Where>
+        <Conditions>
+            <Condition>
+                <Body>XMLTEST3.NAME</Body>
+                <Operator>LIKE</Operator>
+                <Arguments>
+                    <Argument>"text"</Argument>
+                </Arguments>
+                <Separator>AND</Separator>
+            </Condition>
+            <Condition>
+                <Body>XMLTEST3.ID</Body>
+                <Operator>BETWEEN</Operator>
+                <Arguments>
+                    <Argument>10</Argument>
+                    <Argument>15</Argument>
+                </Arguments>
+                <ArgumentsSeparator>AND</ArgumentsSeparator>
+                </Condition>
+            <Condition>
+                <Body>XMLTEST3.NAME</Body>
+                <Operator>IN</Operator>
+                <Arguments>
+                    <Argument>"Dad"</Argument>
+                    <Argument>"Mom"</Argument>
+                </Arguments>
+                <ArgumentsSeparator>,</ArgumentsSeparator>
+                <ArgumentsStart>(</ArgumentsStart>
+                <ArgumentsEnd>)</ArgumentsEnd>
+            </Condition>
+            <Condition>
+                <Body>XMLTEST3.NAME</Body>
+                <Operator>=</Operator>
+                <Arguments>
+                    <Argument>"Dad"</Argument>
+                </Arguments>
             </Condition>
         </Conditions>
     </Where>

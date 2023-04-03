@@ -1,31 +1,20 @@
 <Operation>
     <Type>SELECT</Type>
     <Tables>
-        <Table>XMLTEST1</Table>
-        <Table>XMLTEST2</Table>
+        <Table>TEST1</Table>
     </Tables>
-    <Joins>
-        <Join>
-            <Type>LEFT JOIN</Type>
-            <Condition>XMLTEST1.ID = XMLTEST2.ID</Condition>
-        </Join>
-    </Joins>
     <Columns>
-        <Column>XMLTEST1.ID</Column>
-        <Column>XMLTEST2.ID</Column>
+        <Column>TEST1.ID</Column>
+        <Column>TEST1.NUMB</Column>
     </Columns>
     <Where>
         <Conditions>
             <Condition>
-                <Body>XMLTEST1.ID = 1</Body>
-                <ConditionOperator>AND</ConditionOperator>
-            </Condition>
-            <Condition>
-                <Body>EXISTS</Body>
+                <Body>TEST1.ID IN</Body>
                 <Operation>
                     <Type>SELECT</Type>
                     <Tables>
-                        <Table>XMLTEST1</Table>
+                        <Table>TEST2</Table>
                     </Tables>
                     <Columns>
                         <Column>ID</Column>
@@ -33,7 +22,11 @@
                     <Where>
                         <Conditions>
                             <Condition>
-                                <Body>ID = 1</Body>
+                                <Body>TEST2.NAME LIKE '%a%'</Body>
+                                <ConditionOperator>AND</ConditionOperator>
+                            </Condition>
+                            <Condition>
+                                <Body>TEST2.NUMB BETWEEN 10 AND 15</Body>
                             </Condition>
                         </Conditions>
                     </Where>
